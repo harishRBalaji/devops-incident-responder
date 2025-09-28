@@ -41,41 +41,14 @@ for i, inc in enumerate(incidents):
             if st.button("Open", key=f"open-{inc['id']}"):
                 selected_id = inc["id"]
 
-# --- Modal-like detail view ---
+# --- Inline detail view (no modal) ---
 if selected_id:
     inc = get_incident(selected_id)
 
-    # Create a dialog-like overlay
-    st.markdown(
-        """
-        <style>
-        .overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: rgba(0,0,0,0.5);
-            z-index: 1000;
-        }
-        .dialog {
-            background: white;
-            margin: 5% auto;
-            padding: 2rem;
-            width: 80%;
-            border-radius: 12px;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown('<div class="overlay">', unsafe_allow_html=True)
-    st.markdown('<div class="dialog">', unsafe_allow_html=True)
-
-    st.header(f"Incident #{selected_id}")
+    st.subheader(f"Incident #{selected_id}")
     st.caption(
         f"Service: {inc['service']} • Env: {inc['environment']} • "
-        f"Severity: {inc['severity']} • Created: {inc['created_at']}"
+        f"Severity: {inc['severity']} • Created: {inc['created_at']} • Status: {inc['status']}"
     )
 
     # Poll steps every 5s
@@ -105,7 +78,7 @@ if selected_id:
         with report_placeholder:
             if rep:
                 st.markdown("### Final Report")
-                st.markdown(rep["report_json"])  # full text report blob
+                st.markdown(rep["report_json"], unsafe_allow_html=True)
                 st.download_button(
                     "Download report.txt",
                     data=rep["report_json"],
@@ -117,5 +90,3 @@ if selected_id:
                 st.info("Awaiting final report...")
 
         time.sleep(REFRESH_INTERVAL)
-
-    st.markdown("</div></div>", unsafe_allow_html=True)

@@ -3,6 +3,7 @@ import os, sqlite3, json, datetime, pathlib
 from typing import Any, Dict, Optional, List
 
 DB_FILE = os.environ.get("DB_FILE", "dev.db")
+SCHEMA_PATH = pathlib.Path(__file__).parent / "schema.sql"
 
 def _now_iso() -> str:
     return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -15,11 +16,24 @@ def _conn(rowdict: bool = False) -> sqlite3.Connection:
     return con
 
 def init_db() -> None:
-    schema_path = pathlib.Path(__file__).parent / "schema.sql"
-    sql = schema_path.read_text(encoding="utf-8")
+    """Create all tables from schema.sql (idempotent)."""
+    sql = SCHEMA_PATH.read_text(encoding="utf-8")
     with _conn() as con:
         con.executescript(sql)
 
+def _ensure_schema() -> None:
+    """Ensure required tables exist (safe to call at import)."""
+    required = {"incidents", "agent_steps", "reports"}
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+        have = {r[0] for r in rows}
+        if not required.issubset(have):
+            sql = SCHEMA_PATH.read_text(encoding="utf-8")
+            con.executescript(sql)
+
+_ensure_schema()
 # ---------- writes ----------
 
 def record_incident(

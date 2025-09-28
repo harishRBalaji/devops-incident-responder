@@ -2,7 +2,9 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from app.prompts.prompts import SYSTEM_PROMPT
 from app.tools.tools import fetch_log_file, rag_retrieve, store_final_report
+from dotenv import load_dotenv
 
+load_dotenv()
 # Collect registered tools
 tools = [fetch_log_file, rag_retrieve, store_final_report]
 

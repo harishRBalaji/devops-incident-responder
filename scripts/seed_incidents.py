@@ -1,34 +1,47 @@
-# scripts/seed_incidents.py
-import os, json, datetime
-from sqlalchemy import create_engine, text
+import time
+from app.db.dal import record_incident   # correct import
 
-DB_URL = os.environ.get("DB_URL", "sqlite:///dev.db")
-engine = create_engine(DB_URL, future=True)
-
-def iso_utc():
-    return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-
-def seed_one():
-    with engine.begin() as conn:
-        conn.execute(
-            text("""
-                INSERT INTO incidents(status, service, environment, severity, payload_json, created_at)
-                VALUES(:status, :service, :env, :sev, :payload, :created_at)
-            """),
-            {
-                "status": "OPEN",
-                "service": "payment-service",
-                "env": "prod",
-                "sev": "CRITICAL",
-                "payload": json.dumps({
-                    "alert": "2025-09-27-seed",
-                    "details": "synthetic cloudwatch-like alert",
-                    "service": "payment-service"
-                }),
-                "created_at": iso_utc(),
-            }
-        )
+# Incidents to insert
+incidents = [
+    {
+        "incident_id": "INC001",
+        "status": "OPEN",
+        "service": "checkout-service",
+        "environment": "production",
+        "severity": "CRITICAL",
+        "payload": {"source": "db-connection-pool", "spike_percentage": 100},
+        "created_at": "2025-09-27T15:09:00Z"
+    },
+    {
+        "incident_id": "INC002",
+        "status": "OPEN",
+        "service": "inventory-service",
+        "environment": "production",
+        "severity": "HIGH",
+        "payload": {"source": "slow-query-lock", "spike_percentage": 35},
+        "created_at": "2025-09-27T15:08:00Z"
+    },
+    {
+        "incident_id": "INC003",
+        "status": "OPEN",
+        "service": "orders-service",
+        "environment": "production",
+        "severity": "CRITICAL",
+        "payload": {"source": "deadlock-cascade", "spike_percentage": 102},
+        "created_at": "2025-09-27T15:08:00Z"
+    }
+]
 
 if __name__ == "__main__":
-    seed_one()
-    print("Seeded one incident.")
+    for inc in incidents:
+        incident_id = record_incident(
+            incident_id=inc["incident_id"],
+            status=inc["status"],
+            service=inc["service"],
+            environment=inc["environment"],
+            severity=inc["severity"],
+            payload=inc["payload"],
+            created_at=inc["created_at"]
+        )
+        print(f"✅ Inserted incident with id={incident_id}")
+        time.sleep(30)  # wait 30 seconds before next insert
