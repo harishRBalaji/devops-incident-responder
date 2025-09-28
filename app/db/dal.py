@@ -126,11 +126,13 @@ def get_latest_report(incident_id: int) -> Optional[Dict[str, Any]]:
         r = con.execute(sql, (incident_id,)).fetchone()
     if not r:
         return None
+
     d = dict(r)
-    try:
-        d["report"] = json.loads(d.pop("report_json") or "{}")
-    except Exception:
-        d["report"] = {}
+    # Preserve the raw HTML so the UI can render it.
+    # Also mirror it under "report" for backward compatibility with UIs
+    # that expect "report".
+    html = d.get("report_json") or ""
+    d["report"] = html
     return d
 
 # ---------- helpers for the agent loop ----------

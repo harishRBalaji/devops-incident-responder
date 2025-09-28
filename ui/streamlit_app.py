@@ -28,7 +28,6 @@ st.subheader("Active Incidents")
 cols = st.columns(3, gap="large")
 
 selected_id = None
-
 for i, inc in enumerate(incidents):
     with cols[i % 3]:
         card = st.container(border=True)
@@ -51,11 +50,12 @@ if selected_id:
         f"Severity: {inc['severity']} • Created: {inc['created_at']} • Status: {inc['status']}"
     )
 
-    # Poll steps every 5s
+    # Placeholders we’ll update in a loop
     steps_placeholder = st.empty()
     report_placeholder = st.empty()
 
     while True:
+        # ---- Steps ----
         steps = list_steps(selected_id)
         with steps_placeholder:
             st.markdown("### Agent Steps")
@@ -65,27 +65,37 @@ if selected_id:
                         st.caption(f"Started: {s['ts']}")
                         st.write(s["message"])
                         if s["phase"] == "in_progress":
-                            st.spinner("In progress...")
+                            st.info("In progress…")
                         elif s["phase"] == "complete":
                             st.success("Completed")
                         elif s["phase"] == "error":
                             st.error("Failed")
+                        else:
+                            st.warning(f"Unknown phase: {s['phase']}")
             else:
                 st.info("No steps yet for this incident.")
 
-        # Report (if available)
+        # ---- Final report (if available) ----
         rep = get_latest_report(selected_id)
         with report_placeholder:
             if rep:
                 st.markdown("### Final Report")
-                st.markdown(rep["report_json"], unsafe_allow_html=True)
-                st.download_button(
-                    "Download report.txt",
-                    data=rep["report_json"],
-                    file_name=f"incident_{selected_id}_report.txt",
-                    mime="text/plain",
-                )
-                break  # stop polling once report is ready
+
+                # Support both legacy ('report_json') and current ('report') keys.
+                # If we get a dict (JSON), show it with st.json; if it's a string, render as HTML.
+                raw = rep.get("report_json")
+                if raw is None:
+                    raw = rep.get("report", "")
+
+                if isinstance(raw, dict):
+                    st.json(raw)
+                else:
+                    # raw is expected to be HTML (string). Fallback: pretty-print if not str.
+                    html = raw if isinstance(raw, str) else json.dumps(raw, indent=2)
+                    st.markdown(html, unsafe_allow_html=True)
+
+                # Stop polling once the report is shown
+                break
             else:
                 st.info("Awaiting final report...")
 
