@@ -1,11 +1,14 @@
 import os
 from pinecone import Pinecone, ServerlessSpec
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class PineconeStore:
     def __init__(self, index_name=None):
         api_key = os.getenv("PINECONE_API_KEY")
         env = os.getenv("PINECONE_ENV", "us-east-1")
-        self.index_name = index_name or os.getenv("PINECONE_INDEX_NAME", "incident-rag")
+        self.index_name = index_name or os.getenv("PINECONE_INDEX_NAME", "devops")
 
         # Init client
         self.pc = Pinecone(api_key=api_key)
@@ -23,8 +26,8 @@ class PineconeStore:
 
     def upsert(self, embeddings, chunks):
         vectors = [
-            (f"chunk-{i}", embeddings[i], {"text": chunks[i]})
-            for i in range(len(chunks))
+            (f"chunk-{i}", emb, {"text": chunk})
+            for i, (emb, chunk) in enumerate(zip(embeddings, chunks))
         ]
         self.index.upsert(vectors=vectors)
         print(f"✅ Upserted {len(vectors)} chunks into Pinecone index {self.index_name}")
