@@ -15,7 +15,7 @@ def _conn(rowdict: bool = False) -> sqlite3.Connection:
     return con
 
 def init_db() -> None:
-    sql = pathlib.Path("app/db/schema.sql").read_text(encoding="utf-8")
+    sql = pathlib.Path("schema.sql").read_text(encoding="utf-8")
     with _conn() as con:
         con.executescript(sql)
 
@@ -28,7 +28,7 @@ def record_incident(
     severity: str,
     payload: Dict[str, Any] | None = None,
     created_at: str | None = None,
-    incident_id: int | None = None
+    incident_id: str | None = None
 ) -> int:
     """Insert a new incident and return its id."""
     with _conn() as con:
