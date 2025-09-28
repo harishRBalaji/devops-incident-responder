@@ -1,7 +1,7 @@
 from langchain_openai import ChatOpenAI
-from langchain.agents import AgentExecutor, create_react_agent
-from prompts.prompts import SYSTEM_PROMPT
-from tools.tools import fetch_log_file, rag_retrieve, store_final_report
+from langgraph.prebuilt import create_react_agent
+from app.prompts.prompts import SYSTEM_PROMPT
+from app.tools.tools import fetch_log_file, rag_retrieve, store_final_report
 
 # Collect registered tools
 tools = [fetch_log_file, rag_retrieve, store_final_report]
@@ -9,9 +9,12 @@ tools = [fetch_log_file, rag_retrieve, store_final_report]
 # Model
 model = ChatOpenAI(model="gpt-4o", temperature=0)
 
-# Agent + executor
-agent = create_react_agent(model, tools, SYSTEM_PROMPT)
-agent_executor = AgentExecutor(agent=agent, tools=tools)
+# Agent
+agent = create_react_agent(
+    model=model,
+    tools=tools,
+    prompt=SYSTEM_PROMPT
+)
 
 def run_agent(incident_json: str):
     """
@@ -26,4 +29,4 @@ def run_agent(incident_json: str):
         f"Incident details:\n{incident_json}"
     )
 
-    return agent_executor.invoke({"input": prefixed_input})
+    return agent.invoke({"messages": [{"role": "user", "content": prefixed_input}]})

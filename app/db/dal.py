@@ -15,28 +15,29 @@ def _conn(rowdict: bool = False) -> sqlite3.Connection:
     return con
 
 def init_db() -> None:
-    sql = pathlib.Path("schema.sql").read_text(encoding="utf-8")
+    schema_path = pathlib.Path(__file__).parent / "schema.sql"
+    sql = schema_path.read_text(encoding="utf-8")
     with _conn() as con:
         con.executescript(sql)
 
 # ---------- writes ----------
 
 def record_incident(
+    incident_id: str,            # required, like "INC001"
     status: str,                 # "OPEN" | "IN_PROGRESS" | "DONE" | "FAILED"
     service: str,
     environment: str,
     severity: str,
     payload: Dict[str, Any] | None = None,
     created_at: str | None = None,
-    incident_id: str | None = None
-) -> int:
-    """Insert a new incident and return its id."""
+) -> str:
+    """Insert a new incident and return its id (must be provided)."""
     with _conn() as con:
-        cur = con.execute(
+        con.execute(
             """INSERT INTO incidents(id, status, service, environment, severity, payload_json, created_at)
                VALUES (?,?,?,?,?,?,?)""",
             (
-                incident_id,                       # None → auto id
+                incident_id,
                 status,
                 service,
                 environment,
@@ -45,7 +46,7 @@ def record_incident(
                 created_at or _now_iso(),
             ),
         )
-        return incident_id if incident_id is not None else cur.lastrowid
+    return incident_id
 
 def record_step(
     incident_id: int,
@@ -97,23 +98,15 @@ def get_incident(incident_id: int) -> Optional[Dict[str, Any]]:
         r = con.execute("SELECT * FROM incidents WHERE id=?", (incident_id,)).fetchone()
     return dict(r) if r else None
 
-def list_steps(incident_id: int) -> List[Dict[str, Any]]:
-    sql = """SELECT id, agent, phase, status, message, ts, data_json
+def list_steps(incident_id: str) -> List[Dict[str, Any]]:
+    sql = """SELECT id, phase_title, message, phase, ts
              FROM agent_steps WHERE incident_id=? ORDER BY id ASC"""
     with _conn(rowdict=True) as con:
         rows = con.execute(sql, (incident_id,)).fetchall()
-    out: List[Dict[str, Any]] = []
-    for r in rows:
-        d = dict(r)
-        try:
-            d["data"] = json.loads(d.pop("data_json") or "{}")
-        except Exception:
-            d["data"] = {}
-        out.append(d)
-    return out
+    return [dict(r) for r in rows]
 
 def get_latest_report(incident_id: int) -> Optional[Dict[str, Any]]:
-    sql = """SELECT id, report_json, report_md, created_at
+    sql = """SELECT id, report_json, created_at
              FROM reports WHERE incident_id=? ORDER BY id DESC LIMIT 1"""
     with _conn(rowdict=True) as con:
         r = con.execute(sql, (incident_id,)).fetchone()

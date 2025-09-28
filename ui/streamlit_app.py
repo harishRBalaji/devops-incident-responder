@@ -20,7 +20,7 @@ REFRESH_INTERVAL = 5  # seconds
 incidents = list_incidents(limit=50)
 
 if not incidents:
-    st.info("No incidents yet. Seed one and refresh.")
+    st.info("No incidents yet. Go back to code/coffee and chill!")
     st.stop()
 
 # --- Cards view ---

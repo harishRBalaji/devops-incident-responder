@@ -1,9 +1,10 @@
 import time
-from dal import record_incident   # import your DAL function
+from app.db.dal import record_incident   # import your DAL function
 
 # Incidents to insert
 incidents = [
     {
+        "incident_id": "INC001",
         "status": "OPEN",
         "service": "user-service",
         "environment": "production",
@@ -12,6 +13,7 @@ incidents = [
         "created_at": "2025-09-27T20:30:25Z"
     },
     {
+        "incident_id": "INC002",
         "status": "OPEN",
         "service": "payment-gateway",
         "environment": "production",
@@ -20,6 +22,7 @@ incidents = [
         "created_at": "2025-09-27T15:45:00Z"
     },
     {
+        "incident_id": "INC003",
         "status": "OPEN",
         "service": "fraud-service",
         "environment": "production",
@@ -32,6 +35,7 @@ incidents = [
 if __name__ == "__main__":
     for inc in incidents:
         incident_id = record_incident(
+            incident_id=inc["incident_id"],
             status=inc["status"],
             service=inc["service"],
             environment=inc["environment"],

@@ -4,18 +4,16 @@ import pinecone
 from openai import OpenAI
 from dotenv import load_dotenv
 from langchain.agents import tool
-from db.dal import record_step, update_step_status, save_report
+from app.db.dal import record_step, update_step_status, save_report
+from pinecone import Pinecone
 
 load_dotenv()
 
 # Initialize clients
 client = OpenAI()
-pinecone.init(
-    api_key=os.getenv("PINECONE_API_KEY"),
-    environment=os.getenv("PINECONE_ENV")
-)
 
-INDEX_NAME = "incident-rag"
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 
 # === Tools ===
 
@@ -85,12 +83,20 @@ def rag_retrieve(incident_id: str, log_data: str, phase_title: str, synopsis: st
     """
     step_id = record_step(incident_id, phase_title, synopsis, phase="in_progress")
     try:
-        index = pinecone.Index(INDEX_NAME)
+        index = pc.Index(INDEX_NAME)
+
         embedding = get_embedding(log_data)
-        results = index.query(vector=embedding, top_k=3, include_metadata=True)
-        docs = [match["metadata"].get("text", "") for match in results["matches"]]
+
+        results = index.query(
+            vector=embedding,
+            top_k=3,
+            include_metadata=True
+        )
+
+        docs = [match.metadata.get("text", "") for match in results.matches]
         update_step_status(step_id, "complete")
         return "\n\n".join(docs)
+
     except Exception:
         update_step_status(step_id, "error")
         raise
