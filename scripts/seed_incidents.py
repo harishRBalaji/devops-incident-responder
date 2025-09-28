@@ -1,17 +1,34 @@
-import json
+# scripts/seed_incidents.py
+import os, json, datetime
 from sqlalchemy import create_engine, text
-from app.db.dal import init_db
-from app.config import DB_URL
 
+DB_URL = os.environ.get("DB_URL", "sqlite:///dev.db")
 engine = create_engine(DB_URL, future=True)
-init_db()
 
-def seed_one(service='payment-service', env='prod', alert_type='db-conn-refused', severity='high'):
-    payload = {"alert":"2025-09-27-seed","details":"synthetic cloudwatch-like alert","service":service}
+def iso_utc():
+    return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+def seed_one():
     with engine.begin() as conn:
-        conn.execute(text('INSERT INTO incidents(status,source,service,environment,alert_type,severity,payload_json) VALUES(:s,:src,:svc,:env,:at,:sev,:p)'),
-            {'s':'OPEN','src':'cloudwatch_sim','svc':service,'env':env,'at':alert_type,'sev':severity,'p':json.dumps(payload)})
-    print('Inserted OPEN incident for', service, env, alert_type)
+        conn.execute(
+            text("""
+                INSERT INTO incidents(status, service, environment, severity, payload_json, created_at)
+                VALUES(:status, :service, :env, :sev, :payload, :created_at)
+            """),
+            {
+                "status": "OPEN",
+                "service": "payment-service",
+                "env": "prod",
+                "sev": "CRITICAL",
+                "payload": json.dumps({
+                    "alert": "2025-09-27-seed",
+                    "details": "synthetic cloudwatch-like alert",
+                    "service": "payment-service"
+                }),
+                "created_at": iso_utc(),
+            }
+        )
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     seed_one()
+    print("Seeded one incident.")
