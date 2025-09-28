@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS reports (
 
 -- minimal incidents table (if you don’t have one yet)
 CREATE TABLE IF NOT EXISTS incidents(
-  id          INTEGER PRIMARY KEY,
+  id          TEXT PRIMARY KEY,
   status      TEXT NOT NULL,        -- OPEN | IN_PROGRESS | DONE | FAILED
   service     TEXT NOT NULL,
   environment TEXT NOT NULL,
