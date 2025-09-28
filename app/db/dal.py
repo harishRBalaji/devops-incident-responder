@@ -48,22 +48,39 @@ def record_incident(
         return incident_id if incident_id is not None else cur.lastrowid
 
 def record_step(
-    incident_id: int, agent: str, phase: str, message: str,
-    data: Dict[str, Any] | None = None, status: str | None = None
+    incident_id: int,
+    phase_title: str,
+    message: str,
+    phase: str = "in_progress"
 ) -> None:
+    """
+    Insert a new step into agent_steps and return its row id.
+    phase: "in_progress" | "complete" | "error"
+    """
+    with _conn() as con:
+        cur = con.execute(
+            """INSERT INTO agent_steps(incident_id, phase_title, message, phase, ts)
+               VALUES(?,?,?,?,?)""",
+            (incident_id, phase_title, message, phase, _now_iso())
+        )
+        return cur.lastrowid
+
+
+def update_step_status(step_id: int, new_phase: str) -> None:
+    """Update the phase of a step (e.g., from in_progress → complete)."""
     with _conn() as con:
         con.execute(
-            """INSERT INTO agent_steps(incident_id, agent, phase, message, data_json, ts, status)
-               VALUES(?,?,?,?,?,?,?)""",
-            (incident_id, agent, phase, message, json.dumps(data or {}), _now_iso(), status)
+            """UPDATE agent_steps SET phase=? WHERE id=?""",
+            (new_phase, step_id)
         )
 
-def save_report(incident_id: int, report_json: Dict[str, Any], report_md: str) -> None:
+def save_report(incident_id: int, report_text: str) -> None:
+    """Save a full incident report (as text blob) into the reports table."""
     with _conn() as con:
         con.execute(
-            """INSERT INTO reports(incident_id, report_json, report_md, created_at)
-               VALUES(?,?,?,?)""",
-            (incident_id, json.dumps(report_json), report_md, _now_iso())
+            """INSERT INTO reports(incident_id, report_json, created_at)
+               VALUES(?,?,?)""",
+            (incident_id, report_text, _now_iso())
         )
 
 # ---------- reads (for UI) ----------

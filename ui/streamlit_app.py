@@ -1,55 +1,9 @@
-# import streamlit as st
-# from sqlalchemy import create_engine, text
-# from app.config import DB_URL
-# import pandas as pd
-
-# st.set_page_config(page_title='Incident Responder', layout='wide')
-# st.title('🔧 DevOps Incident Responder — MVP')
-
-# engine = create_engine(DB_URL, future=True)
-
-# def load_df(sql, params=None):
-#     with engine.begin() as conn:
-#         res = conn.execute(text(sql), params or {})
-#         rows = [dict(r._mapping) for r in res]
-#         return pd.DataFrame(rows)
-
-# tabs = st.tabs(['Incidents','Agent Steps','Reports'])
-
-# with tabs[0]:
-#     st.header('Incidents')
-#     st.caption('Auto-refresh every ~5s (use Streamlit rerun)')
-#     if st.button('Refresh incidents'):
-#         st.experimental_rerun()
-#     df = load_df('SELECT * FROM incidents ORDER BY id DESC')
-#     st.dataframe(df, use_container_width=True)
-
-# with tabs[1]:
-#     st.header('Agent Steps')
-#     if st.button('Refresh steps'):
-#         st.experimental_rerun()
-#     df = load_df('SELECT * FROM agent_steps ORDER BY ts DESC, id DESC')
-#     st.dataframe(df, use_container_width=True)
-
-# with tabs[2]:
-#     st.header('Reports')
-#     if st.button('Refresh reports'):
-#         st.experimental_rerun()
-#     df = load_df('SELECT id, incident_id, substr(report_md,1,120) AS preview, created_at FROM reports ORDER BY id DESC')
-#     st.dataframe(df, use_container_width=True)
-#     rid = st.text_input('Open report by incident_id')
-#     if rid:
-#         rdf = load_df('SELECT report_md FROM reports WHERE incident_id = :i', {'i': rid})
-#         if not rdf.empty:
-#             st.markdown(rdf.iloc[0]['report_md'])
-#         else:
-#             st.info('No report found.')
 # ui/streamlit_app.py
+import time
 import json
 import pandas as pd
 import streamlit as st
 
-# Import directly from your single DAL
 from app.db.dal import (
     list_incidents,
     get_incident,
@@ -58,74 +12,110 @@ from app.db.dal import (
 )
 
 st.set_page_config(page_title="Incident Responder", layout="wide")
-st.title("Incidents")
+st.title("🔧 DevOps Incident Responder — MVP")
 
-# --- Left: incidents list ---
-incidents = list_incidents(limit=200)
+REFRESH_INTERVAL = 5  # seconds
 
-left, right = st.columns([1, 2], gap="large")
+# --- Load incidents ---
+incidents = list_incidents(limit=50)
 
-with left:
-    st.subheader("All Incidents")
-    if not incidents:
-        st.info("No incidents yet. Seed one and refresh.")
-        st.stop()
+if not incidents:
+    st.info("No incidents yet. Seed one and refresh.")
+    st.stop()
 
-    df = pd.DataFrame(incidents)
-    st.dataframe(df, use_container_width=True, hide_index=True)
+# --- Cards view ---
+st.subheader("Active Incidents")
+cols = st.columns(3, gap="large")
 
-    # Build a friendly selector (id — service [status])
-    options = [f"{row['id']} — {row['service']} [{row['status']}]" for row in incidents]
-    choice = st.selectbox("Select an incident", options, index=0)
-    selected_id = int(choice.split(" — ")[0])
+selected_id = None
 
-# --- Right: details for selected incident ---
-with right:
+for i, inc in enumerate(incidents):
+    with cols[i % 3]:
+        card = st.container(border=True)
+        with card:
+            st.markdown(f"**Incident #{inc['id']}**")
+            st.caption(
+                f"Service: {inc['service']} • Env: {inc['environment']} • "
+                f"Severity: {inc['severity']} • Status: {inc['status']}"
+            )
+            if st.button("Open", key=f"open-{inc['id']}"):
+                selected_id = inc["id"]
+
+# --- Modal-like detail view ---
+if selected_id:
     inc = get_incident(selected_id)
-    st.subheader(f"Incident #{selected_id}")
+
+    # Create a dialog-like overlay
+    st.markdown(
+        """
+        <style>
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .dialog {
+            background: white;
+            margin: 5% auto;
+            padding: 2rem;
+            width: 80%;
+            border-radius: 12px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="overlay">', unsafe_allow_html=True)
+    st.markdown('<div class="dialog">', unsafe_allow_html=True)
+
+    st.header(f"Incident #{selected_id}")
     st.caption(
         f"Service: {inc['service']} • Env: {inc['environment']} • "
         f"Severity: {inc['severity']} • Created: {inc['created_at']}"
     )
 
-    # Steps timeline
-    st.markdown("### Agent Steps")
-    steps = list_steps(selected_id)
-    if steps:
-        steps_df = pd.DataFrame([
-            {
-                "id": s["id"],
-                "agent": s["agent"],
-                "phase": s["phase"],
-                "status": s.get("status"),
-                "message": s["message"],
-                "ts": s["ts"],
-                "data": s.get("data", {}),
-            }
-            for s in steps
-        ])
-        st.dataframe(steps_df, use_container_width=True, hide_index=True, height=320)
-    else:
-        st.info("No steps yet for this incident.")
+    # Poll steps every 5s
+    steps_placeholder = st.empty()
+    report_placeholder = st.empty()
 
-    # Report
-    st.markdown("### Report")
-    rep = get_latest_report(selected_id)
-    if rep:
-        st.markdown(rep["report_md"])
-        # Downloads
-        st.download_button(
-            "Download report.json",
-            data=json.dumps(rep["report"], indent=2),
-            file_name=f"incident_{selected_id}_report.json",
-            mime="application/json",
-        )
-        st.download_button(
-            "Download report.md",
-            data=rep["report_md"],
-            file_name=f"incident_{selected_id}_report.md",
-            mime="text/markdown",
-        )
-    else:
-        st.info("No report generated yet.")
+    while True:
+        steps = list_steps(selected_id)
+        with steps_placeholder:
+            st.markdown("### Agent Steps")
+            if steps:
+                for s in steps:
+                    with st.expander(s["phase_title"], expanded=True):
+                        st.caption(f"Started: {s['ts']}")
+                        st.write(s["message"])
+                        if s["phase"] == "in_progress":
+                            st.spinner("In progress...")
+                        elif s["phase"] == "complete":
+                            st.success("Completed")
+                        elif s["phase"] == "error":
+                            st.error("Failed")
+            else:
+                st.info("No steps yet for this incident.")
 
+        # Report (if available)
+        rep = get_latest_report(selected_id)
+        with report_placeholder:
+            if rep:
+                st.markdown("### Final Report")
+                st.markdown(rep["report_json"])  # full text report blob
+                st.download_button(
+                    "Download report.txt",
+                    data=rep["report_json"],
+                    file_name=f"incident_{selected_id}_report.txt",
+                    mime="text/plain",
+                )
+                break  # stop polling once report is ready
+            else:
+                st.info("Awaiting final report...")
+
+        time.sleep(REFRESH_INTERVAL)
+
+    st.markdown("</div></div>", unsafe_allow_html=True)
